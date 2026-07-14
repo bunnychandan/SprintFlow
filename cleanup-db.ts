@@ -20,7 +20,7 @@ async function cleanup() {
         });
         console.log("✓ Deleted stale user record");
       } else {
-        console.log("User already has linked accounts:", user.accounts.map((a) => a.provider));
+        console.log("User already has linked accounts:", user.accounts.map((a: { provider: string }) => a.provider));
       }
     } else {
       console.log("No user found with that email - fresh start");
