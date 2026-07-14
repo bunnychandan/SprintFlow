@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-light: var(--accent-light);
+
+  --color-background: var(--bg-primary);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-elevated: var(--bg-elevated);
+
+  --color-foreground: var(--text-primary);
+  --color-foreground-secondary: var(--text-secondary);
+  --color-foreground-muted: var(--text-muted);
+
+  --color-border: var(--border-color);
+  --color-border-hover: var(--border-hover);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-info: var(--info);
+
+  --shadow-card: var(--shadow-card-value);
+  --shadow-dropdown: var(--shadow-dropdown-value);
+  --shadow-dialog: var(--shadow-dialog-value);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --bg-primary: #04070d;
+  --bg-surface: #0f172a;
+  --bg-surface-hover: #1e293b;
+  --bg-elevated: #1e293b;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+
+  --accent: #06b6d4;
+  --accent-hover: #22d3ee;
+  --accent-foreground: #04070d;
+  --accent-light: rgba(6, 182, 212, 0.12);
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --info: #3b82f6;
+
+  --shadow-card-value: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-dropdown-value: 0 10px 15px -3px rgba(0,0,0,0.4);
+  --shadow-dialog-value: 0 25px 50px -12px rgba(0,0,0,0.5);
+
+  color-scheme: dark;
+}
+
+.light {
+  --bg-primary: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-surface-hover: #f1f5f9;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+
+  --accent: #0891b2;
+  --accent-hover: #0e7490;
+  --accent-foreground: #ffffff;
+  --accent-light: rgba(8, 145, 178, 0.1);
+
+  --success: #059669;
+  --warning: #d97706;
+  --destructive: #dc2626;
+  --info: #2563eb;
+
+  --shadow-card-value: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-dropdown-value: 0 10px 15px -3px rgba(0,0,0,0.1);
+  --shadow-dialog-value: 0 25px 50px -12px rgba(0,0,0,0.25);
+
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+* { box-sizing: border-box; }
+
+::selection {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }

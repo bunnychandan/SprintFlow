@@ -1,0 +1,235 @@
+
+> sprint-flow@0.1.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+- Environments: .env
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 13.9s
+  Running TypeScript ...
+  Finished TypeScript in 14.1s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/100) ...
+  Generating static pages using 11 workers (25/100) 
+  Generating static pages using 11 workers (50/100) 
+  Generating static pages using 11 workers (75/100) 
+✓ Generating static pages using 11 workers (100/100) in 738ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/admins
+├ ƒ /admin/admins/[id]
+├ ƒ /admin/audit
+├ ƒ /admin/audit/[id]
+├ ƒ /admin/dashboard
+├ ƒ /admin/invitations
+├ ƒ /admin/invitations/[id]
+├ ƒ /admin/settings
+├ ƒ /admin/system-health
+├ ƒ /admin/users
+├ ƒ /admin/users/[id]
+├ ƒ /analytics
+├ ƒ /analytics/epics/[id]
+├ ƒ /analytics/projects/[id]
+├ ƒ /analytics/releases/[id]
+├ ƒ /analytics/sprints/[id]
+├ ƒ /api/admin/admins
+├ ƒ /api/admin/admins/[id]
+├ ƒ /api/admin/admins/bulk
+├ ƒ /api/admin/admins/export
+├ ƒ /api/admin/audit
+├ ƒ /api/admin/audit/[id]
+├ ƒ /api/admin/audit/activity
+├ ƒ /api/admin/audit/dashboard
+├ ƒ /api/admin/audit/export
+├ ƒ /api/admin/invitations
+├ ƒ /api/admin/invitations/[id]
+├ ƒ /api/admin/invitations/[id]/duplicate
+├ ƒ /api/admin/invitations/[id]/extend
+├ ƒ /api/admin/invitations/[id]/resend
+├ ƒ /api/admin/invitations/bulk
+├ ƒ /api/admin/invitations/export
+├ ƒ /api/admin/organization
+├ ƒ /api/admin/organization/analytics
+├ ƒ /api/admin/organization/branding
+├ ƒ /api/admin/organization/feature-flags
+├ ƒ /api/admin/organization/holidays
+├ ƒ /api/admin/organization/holidays/[id]
+├ ƒ /api/admin/organization/settings
+├ ƒ /api/admin/system-health
+├ ƒ /api/admin/system-health/alerts
+├ ƒ /api/admin/system-health/alerts/[id]
+├ ƒ /api/admin/system-health/diagnostics
+├ ƒ /api/admin/system-health/history
+├ ƒ /api/admin/system-health/settings
+├ ƒ /api/admin/users
+├ ƒ /api/admin/users/[id]
+├ ƒ /api/admin/users/bulk
+├ ƒ /api/admin/users/export
+├ ƒ /api/analytics/burndown
+├ ƒ /api/analytics/burnup
+├ ƒ /api/analytics/cumulative-flow
+├ ƒ /api/analytics/cycle-time
+├ ƒ /api/analytics/dashboard
+├ ƒ /api/analytics/epics/[id]
+├ ƒ /api/analytics/export
+├ ƒ /api/analytics/lead-time
+├ ƒ /api/analytics/projects/[id]
+├ ƒ /api/analytics/releases/[id]
+├ ƒ /api/analytics/sprints/[id]
+├ ƒ /api/analytics/team
+├ ƒ /api/analytics/velocity
+├ ƒ /api/analytics/workload
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/debug/oauth-cleanup
+├ ƒ /api/devops/dashboard
+├ ƒ /api/devops/deployments
+├ ƒ /api/devops/deployments/[id]
+├ ƒ /api/devops/deployments/[id]/cancel
+├ ƒ /api/devops/deployments/[id]/rollback
+├ ƒ /api/devops/deployments/[id]/start
+├ ƒ /api/devops/export
+├ ƒ /api/devops/logs
+├ ƒ /api/devops/pipelines
+├ ƒ /api/devops/pipelines/[id]
+├ ƒ /api/devops/pipelines/[id]/run
+├ ƒ /api/documents
+├ ƒ /api/documents/[id]
+├ ƒ /api/documents/[id]/archive
+├ ƒ /api/documents/[id]/comments
+├ ƒ /api/documents/[id]/comments/[commentId]
+├ ƒ /api/documents/[id]/duplicate
+├ ƒ /api/documents/[id]/export
+├ ƒ /api/documents/[id]/favorite
+├ ƒ /api/documents/[id]/publish
+├ ƒ /api/documents/[id]/restore
+├ ƒ /api/documents/[id]/stats
+├ ƒ /api/documents/[id]/timeline
+├ ƒ /api/documents/[id]/versions
+├ ƒ /api/documents/[id]/versions/restore
+├ ƒ /api/documents/search
+├ ƒ /api/epics
+├ ƒ /api/epics/[id]
+├ ƒ /api/epics/[id]/stats
+├ ƒ /api/epics/[id]/timeline
+├ ƒ /api/health
+├ ƒ /api/invitations/[token]
+├ ƒ /api/knowledge
+├ ƒ /api/knowledge/[id]
+├ ƒ /api/knowledge/dashboard
+├ ƒ /api/notifications
+├ ƒ /api/notifications/[id]
+├ ƒ /api/notifications/[id]/read
+├ ƒ /api/notifications/bulk
+├ ƒ /api/notifications/preferences
+├ ƒ /api/notifications/read-all
+├ ƒ /api/notifications/unread-count
+├ ƒ /api/projects
+├ ƒ /api/projects/[id]
+├ ƒ /api/projects/[id]/archive
+├ ƒ /api/projects/[id]/backlog
+├ ƒ /api/projects/[id]/backlog/bulk
+├ ƒ /api/projects/[id]/backlog/move
+├ ƒ /api/projects/[id]/backlog/reorder
+├ ƒ /api/projects/[id]/board
+├ ƒ /api/projects/[id]/board/move
+├ ƒ /api/projects/[id]/board/preferences
+├ ƒ /api/projects/[id]/board/reorder
+├ ƒ /api/projects/[id]/board/statistics
+├ ƒ /api/projects/[id]/favorite
+├ ƒ /api/projects/[id]/files
+├ ƒ /api/projects/[id]/members
+├ ƒ /api/projects/[id]/members/[userId]/role
+├ ƒ /api/projects/[id]/restore
+├ ƒ /api/projects/[id]/sprints
+├ ƒ /api/projects/[id]/stats
+├ ƒ /api/projects/[id]/timeline
+├ ƒ /api/projects/[id]/transfer
+├ ƒ /api/projects/bulk
+├ ƒ /api/releases
+├ ƒ /api/releases/[id]
+├ ƒ /api/releases/[id]/cancel
+├ ƒ /api/releases/[id]/publish
+├ ƒ /api/releases/[id]/stats
+├ ƒ /api/resources
+├ ƒ /api/resources/[id]
+├ ƒ /api/resources/availability
+├ ƒ /api/resources/calendar
+├ ƒ /api/resources/capacity
+├ ƒ /api/resources/reports
+├ ƒ /api/resources/reports/export
+├ ƒ /api/resources/timesheet
+├ ƒ /api/resources/timesheet/[id]
+├ ƒ /api/resources/timesheet/approve
+├ ƒ /api/resources/timesheet/reject
+├ ƒ /api/resources/timesheet/submit
+├ ƒ /api/resources/workload
+├ ƒ /api/sprints
+├ ƒ /api/sprints/[id]
+├ ƒ /api/sprints/[id]/cancel
+├ ƒ /api/sprints/[id]/complete
+├ ƒ /api/sprints/[id]/move-task
+├ ƒ /api/sprints/[id]/start
+├ ƒ /api/sprints/[id]/stats
+├ ƒ /api/sprints/[id]/timeline
+├ ƒ /api/sprints/bulk
+├ ƒ /api/tasks
+├ ƒ /api/tasks/[id]
+├ ƒ /api/tasks/[id]/activity
+├ ƒ /api/tasks/[id]/archive
+├ ƒ /api/tasks/[id]/attachments
+├ ƒ /api/tasks/[id]/checklist
+├ ƒ /api/tasks/[id]/checklist/[itemId]
+├ ƒ /api/tasks/[id]/comments
+├ ƒ /api/tasks/[id]/comments/[commentId]
+├ ƒ /api/tasks/[id]/duplicate
+├ ƒ /api/tasks/[id]/history
+├ ƒ /api/tasks/[id]/relationships
+├ ƒ /api/tasks/[id]/relationships/[relationshipId]
+├ ƒ /api/tasks/[id]/restore
+├ ƒ /api/tasks/[id]/worklogs
+├ ƒ /api/tasks/bulk
+├ ƒ /dashboard
+├ ƒ /devops
+├ ƒ /devops/deployments
+├ ƒ /devops/deployments/[id]
+├ ƒ /devops/pipelines
+├ ƒ /devops/pipelines/[id]
+├ ƒ /documents
+├ ƒ /documents/[id]
+├ ƒ /documents/[id]/edit
+├ ƒ /documents/search
+├ ƒ /epics
+├ ƒ /epics/[id]
+├ ƒ /knowledge
+├ ƒ /knowledge/[id]
+├ ○ /login
+├ ƒ /notifications
+├ ƒ /notifications/[id]
+├ ƒ /notifications/preferences
+├ ƒ /projects
+├ ƒ /projects/[id]
+├ ƒ /projects/[id]/backlog
+├ ƒ /projects/[id]/board
+├ ƒ /releases
+├ ƒ /releases/[id]
+├ ƒ /resources
+├ ƒ /resources/[id]
+├ ƒ /resources/reports
+├ ƒ /resources/timesheets
+├ ƒ /sprints
+├ ƒ /sprints/[id]
+├ ƒ /tasks
+└ ƒ /tasks/[id]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

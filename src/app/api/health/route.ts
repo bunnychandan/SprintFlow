@@ -1,0 +1,18 @@
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return Response.json({
+      ok: true,
+      service: "SprintFlow API",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    return Response.json(
+      { ok: false, service: "SprintFlow API", database: "disconnected", timestamp: new Date().toISOString() },
+      { status: 503 },
+    );
+  }
+}
