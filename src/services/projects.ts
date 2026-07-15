@@ -143,9 +143,4 @@ export async function toggleProjectFavorite(id: string, favorite: boolean) {
   return res.json();
 }
 
-export async function getRecentProjects(): Promise<ProjectListResponse> {
-  const sp = new URLSearchParams({ sortBy: "updatedAt", sortOrder: "desc", pageSize: "5" });
-  const res = await fetch(`/api/projects?${sp.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch recent projects");
-  return res.json();
-}
+

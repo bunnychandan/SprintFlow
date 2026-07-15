@@ -14,8 +14,8 @@ export async function POST(
   const actorId = authz.user?.id ?? authz.session?.user?.id;
   if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const project = await prisma.project.findFirst({ where: { id, deletedAt: null } });
-  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project || project.deletedAt) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   if (project.status !== "ARCHIVED") {
     return NextResponse.json({ error: "Project is not archived" }, { status: 400 });

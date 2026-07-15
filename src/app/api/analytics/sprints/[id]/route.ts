@@ -8,8 +8,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const sprint = await prisma.sprint.findFirst({ where: { id, deletedAt: null } });
-  if (!sprint) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
+  const sprint = await prisma.sprint.findUnique({ where: { id } });
+  if (!sprint || sprint.deletedAt) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(sprint.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

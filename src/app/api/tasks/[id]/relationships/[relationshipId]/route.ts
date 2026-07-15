@@ -8,8 +8,8 @@ export async function DELETE(
 ) {
   const { id, relationshipId } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const rel = await prisma.taskRelationship.findUnique({ where: { id: relationshipId } });
   if (!rel || rel.taskId !== id) return NextResponse.json({ error: "Relationship not found" }, { status: 404 });

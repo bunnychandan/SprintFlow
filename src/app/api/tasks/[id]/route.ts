@@ -5,6 +5,48 @@ import { taskUpdateSchema } from "@/lib/validations";
 import { createTaskHistory } from "@/lib/task/history";
 import { handleApiError } from "@/lib/api-error-handler";
 
+export const taskDetailInclude = {
+  reporter: { select: { id: true, name: true, email: true, image: true } },
+  assignee: { select: { id: true, name: true, email: true, image: true } },
+  project: { select: { id: true, name: true, code: true, color: true, status: true } },
+  sprint: { select: { id: true, name: true, status: true, startDate: true, endDate: true } },
+  epic: { select: { id: true, title: true, color: true, status: true, priority: true } },
+  release: { select: { id: true, name: true, version: true, status: true } },
+  updatedBy: { select: { id: true, name: true, email: true, image: true } },
+  comments: {
+    orderBy: { createdAt: "asc" },
+    include: { author: { select: { id: true, name: true, email: true, image: true } } },
+  },
+  attachments: {
+    orderBy: { createdAt: "desc" },
+    include: { user: { select: { id: true, name: true, image: true } } },
+  },
+  relationships: {
+    include: { relatedTask: { select: { id: true, title: true, status: true, type: true } } },
+  },
+  relatedFrom: {
+    include: { task: { select: { id: true, title: true, status: true, type: true } } },
+  },
+  checklist: { orderBy: { order: "asc" } },
+  workLogs: {
+    orderBy: { loggedAt: "desc" },
+    include: { user: { select: { id: true, name: true, image: true } } },
+  },
+  history: {
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: { user: { select: { id: true, name: true, image: true } } },
+  },
+} as const;
+
+async function findTask(id: string) {
+  return prisma.task.findUnique({
+    where: { id },
+    include: taskDetailInclude,
+  });
+}
+
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -12,44 +54,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const task = await prisma.task.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        reporter: { select: { id: true, name: true, email: true, image: true } },
-        assignee: { select: { id: true, name: true, email: true, image: true } },
-        project: { select: { id: true, name: true, code: true, color: true, status: true } },
-        sprint: { select: { id: true, name: true, status: true, startDate: true, endDate: true } },
-        epic: { select: { id: true, title: true, color: true, status: true, priority: true } },
-        release: { select: { id: true, name: true, version: true, status: true } },
-        updatedBy: { select: { id: true, name: true, email: true, image: true } },
-        comments: {
-          orderBy: { createdAt: "asc" },
-          include: { author: { select: { id: true, name: true, email: true, image: true } } },
-        },
-        attachments: {
-          orderBy: { createdAt: "desc" },
-          include: { user: { select: { id: true, name: true, image: true } } },
-        },
-        relationships: {
-          include: { relatedTask: { select: { id: true, title: true, status: true, type: true } } },
-        },
-        relatedFrom: {
-          include: { task: { select: { id: true, title: true, status: true, type: true } } },
-        },
-        checklist: { orderBy: { order: "asc" } },
-        workLogs: {
-          orderBy: { loggedAt: "desc" },
-          include: { user: { select: { id: true, name: true, image: true } } },
-        },
-        history: {
-          orderBy: { createdAt: "desc" },
-          take: 50,
-          include: { user: { select: { id: true, name: true, image: true } } },
-        },
-      },
-    });
-
-    if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const task = await findTask(id);
+    if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
     const authz = await requireProjectAccess(task.projectId);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -67,7 +73,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const taskExists = await prisma.task.findFirst({ where: { id, deletedAt: null } });
+    const taskExists = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, status: true, epicId: true, releaseId: true, assigneeId: true, reporterId: true, title: true } });
     if (!taskExists) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
     if (taskExists.status === "DONE" || taskExists.status === "CANCELLED") {
@@ -87,27 +93,19 @@ export async function PUT(
     if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const data = parsed.data;
-
     const dataToUpdate: Record<string, unknown> = { updatedById: actorId };
-    if (data.title !== undefined) dataToUpdate.title = data.title;
-    if (data.description !== undefined) dataToUpdate.description = data.description;
-    if (data.status !== undefined) dataToUpdate.status = data.status;
-    if (data.priority !== undefined) dataToUpdate.priority = data.priority;
-    if (data.type !== undefined) dataToUpdate.type = data.type;
-    if (data.originalEstimate !== undefined) dataToUpdate.originalEstimate = data.originalEstimate;
-    if (data.timeSpent !== undefined) dataToUpdate.timeSpent = data.timeSpent;
-    if (data.timeRemaining !== undefined) dataToUpdate.timeRemaining = data.timeRemaining;
-    if (data.assigneeId !== undefined) dataToUpdate.assigneeId = data.assigneeId;
-    if (data.sprintId !== undefined) dataToUpdate.sprintId = data.sprintId;
-    if (data.epicId !== undefined) dataToUpdate.epicId = data.epicId;
-    if (data.releaseId !== undefined) dataToUpdate.releaseId = data.releaseId;
-    if (data.backlogOrder !== undefined) dataToUpdate.backlogOrder = data.backlogOrder;
-    if (data.storyPoints !== undefined) dataToUpdate.storyPoints = data.storyPoints;
-    if (data.dueDate !== undefined) dataToUpdate.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-    if (data.labels !== undefined) dataToUpdate.labels = data.labels;
+    const scalarFields = ["title", "description", "status", "priority", "type", "originalEstimate", "timeSpent", "timeRemaining", "assigneeId", "sprintId", "epicId", "releaseId", "backlogOrder", "storyPoints", "labels"];
+    const dateFields = ["dueDate"];
+
+    for (const field of scalarFields) {
+      if ((data as any)[field] !== undefined) dataToUpdate[field] = (data as any)[field];
+    }
+    for (const field of dateFields) {
+      if ((data as any)[field] !== undefined) dataToUpdate[field] = (data as any)[field] ? new Date((data as any)[field]) : null;
+    }
 
     if (data.sprintId) {
-      const sprint = await prisma.sprint.findUnique({ where: { id: data.sprintId } });
+      const sprint = await prisma.sprint.findUnique({ where: { id: data.sprintId }, select: { projectId: true } });
       if (sprint && sprint.projectId !== taskExists.projectId) {
         return NextResponse.json({ error: "Sprint must belong to the same project" }, { status: 400 });
       }
@@ -115,7 +113,7 @@ export async function PUT(
 
     if (data.epicId !== undefined && data.epicId !== taskExists.epicId) {
       if (data.epicId) {
-        const epic = await prisma.epic.findFirst({ where: { id: data.epicId, archivedAt: null } });
+        const epic = await prisma.epic.findUnique({ where: { id: data.epicId }, select: { projectId: true, status: true } });
         if (!epic) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
         if (epic.projectId !== taskExists.projectId) return NextResponse.json({ error: "Epic must belong to the same project" }, { status: 400 });
         if (epic.status === "COMPLETED" || epic.status === "CANCELLED") {
@@ -126,7 +124,7 @@ export async function PUT(
 
     if (data.releaseId !== undefined && data.releaseId !== taskExists.releaseId) {
       if (data.releaseId) {
-        const release = await prisma.release.findFirst({ where: { id: data.releaseId, archivedAt: null } });
+        const release = await prisma.release.findUnique({ where: { id: data.releaseId }, select: { projectId: true, status: true } });
         if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
         if (release.projectId !== taskExists.projectId) return NextResponse.json({ error: "Release must belong to the same project" }, { status: 400 });
         if (release.status === "RELEASED" || release.status === "CANCELLED") {
@@ -144,7 +142,7 @@ export async function PUT(
       },
     });
 
-    await createTaskHistory(taskExists, dataToUpdate, actorId, id);
+    await createTaskHistory(taskExists as any, dataToUpdate, actorId, id);
 
     const changedFields = Object.keys(dataToUpdate).filter(k => k !== "updatedById").join(", ");
     await prisma.auditLog.create({
@@ -155,13 +153,9 @@ export async function PUT(
       await prisma.notification.create({
         data: {
           recipientId: task.reporterId,
-          actorId,
-          projectId: task.projectId,
-          taskId: id,
-          type: "TASK_COMPLETED",
-          title: "Task Completed",
-          message: `Task "${task.title}" has been completed.`,
-          channel: "IN_APP",
+          actorId, projectId: task.projectId, taskId: id,
+          type: "TASK_COMPLETED", title: "Task Completed",
+          message: `Task "${task.title}" has been completed.`, channel: "IN_APP",
         },
       });
     }
@@ -169,27 +163,17 @@ export async function PUT(
     if (data.assigneeId !== undefined && data.assigneeId !== taskExists.assigneeId && data.assigneeId) {
       await prisma.notification.create({
         data: {
-          recipientId: data.assigneeId,
-          actorId,
-          projectId: task.projectId,
-          taskId: id,
-          type: "TASK_ASSIGNED",
-          title: "Task Assigned",
-          message: `You have been assigned to task "${task.title}"`,
-          channel: "IN_APP",
+          recipientId: data.assigneeId, actorId, projectId: task.projectId, taskId: id,
+          type: "TASK_ASSIGNED", title: "Task Assigned",
+          message: `You have been assigned to task "${task.title}"`, channel: "IN_APP",
         },
       });
       if (taskExists.assigneeId) {
         await prisma.notification.create({
           data: {
-            recipientId: taskExists.assigneeId,
-            actorId,
-            projectId: task.projectId,
-            taskId: id,
-            type: "TASK_UPDATED",
-            title: "Task Reassigned",
-            message: `Task "${task.title}" has been reassigned.`,
-            channel: "IN_APP",
+            recipientId: taskExists.assigneeId, actorId, projectId: task.projectId, taskId: id,
+            type: "TASK_UPDATED", title: "Task Reassigned",
+            message: `Task "${task.title}" has been reassigned.`, channel: "IN_APP",
           },
         });
       }
@@ -208,14 +192,14 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const taskExists = await prisma.task.findFirst({ where: { id, deletedAt: null } });
-    if (!taskExists) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, reporterId: true, title: true, deletedAt: true } });
+    if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
-    const authz = await requireProjectAccess(taskExists.projectId);
+    const authz = await requireProjectAccess(task.projectId);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
 
     const isPmOrScrum = authz.member && ["PROJECT_MANAGER", "SCRUM_MASTER"].includes(authz.member.roleInProject);
-    const isReporter = taskExists.reporterId === authz.user?.id;
+    const isReporter = task.reporterId === authz.user?.id;
     const isGlobalAdmin = ["SUPER_ADMIN", "ADMIN"].includes(authz.user?.role ?? "");
 
     if (!isPmOrScrum && !isReporter && !isGlobalAdmin) {
@@ -230,7 +214,7 @@ export async function DELETE(
     });
 
     await prisma.auditLog.create({
-      data: { actorId, entityType: "TASK", entityId: id, action: "DELETE_TASK", details: `Soft-deleted task ${taskExists.title}`, projectId: taskExists.projectId },
+      data: { actorId, entityType: "TASK", entityId: id, action: "DELETE_TASK", details: `Soft-deleted task ${task.title}`, projectId: task.projectId },
     });
 
     return NextResponse.json({ message: "Task deleted successfully" });

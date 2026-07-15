@@ -11,8 +11,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const release = await prisma.release.findFirst({
-      where: { id, archivedAt: null },
+    const release = await prisma.release.findUnique({
+      where: { id },
       include: {
         createdBy: { select: { id: true, name: true, email: true, image: true } },
         updatedBy: { select: { id: true, name: true, email: true, image: true } },
@@ -21,7 +21,7 @@ export async function GET(
       },
     });
 
-    if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
+    if (!release || release.archivedAt) return NextResponse.json({ error: "Release not found" }, { status: 404 });
 
     const authz = await requireProjectAccess(release.projectId);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -39,7 +39,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const release = await prisma.release.findFirst({ where: { id, archivedAt: null } });
+    const release = await prisma.release.findUnique({ where: { id }, select: { id: true, projectId: true, status: true, name: true } });
     if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
 
     if (release.status === "RELEASED" || release.status === "CANCELLED") {
@@ -59,7 +59,6 @@ export async function PUT(
     if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const data = parsed.data;
-
     const dataToUpdate: Record<string, unknown> = { updatedById: actorId };
     if (data.name !== undefined) dataToUpdate.name = data.name;
     if (data.version !== undefined) dataToUpdate.version = data.version;
@@ -94,8 +93,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const release = await prisma.release.findFirst({ where: { id, archivedAt: null } });
-    if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
+    const release = await prisma.release.findUnique({ where: { id }, select: { id: true, projectId: true, name: true, status: true, archivedAt: true } });
+    if (!release || release.archivedAt) return NextResponse.json({ error: "Release not found" }, { status: 404 });
 
     if (release.status === "RELEASED") {
       return NextResponse.json({ error: "Cannot delete a released release" }, { status: 400 });

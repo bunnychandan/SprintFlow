@@ -15,8 +15,8 @@ export async function GET(
 
     const sessionUserId = authz.user?.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id, deletedAt: null },
+    const project = await prisma.project.findUnique({
+      where: { id },
       include: {
         owner: { select: { id: true, name: true, email: true, image: true } },
         members: {

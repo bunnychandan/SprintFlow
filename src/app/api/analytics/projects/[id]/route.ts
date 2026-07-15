@@ -11,8 +11,8 @@ export async function GET(
   const authz = await requireProjectAccess(id);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
 
-  const project = await prisma.project.findFirst({ where: { id, deletedAt: null } });
-  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project || project.deletedAt) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const [tasks, sprints, members] = await Promise.all([
     prisma.task.findMany({ where: { projectId: id, deletedAt: null }, select: { status: true, priority: true, type: true, storyPoints: true, dueDate: true, assigneeId: true, assignee: { select: { id: true, name: true, email: true, image: true } } } }),

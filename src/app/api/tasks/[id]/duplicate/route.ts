@@ -8,8 +8,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const original = await prisma.task.findFirst({ where: { id, deletedAt: null } });
-  if (!original) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const original = await prisma.task.findUnique({ where: { id } });
+  if (!original || original.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(original.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER", "DEVELOPER"]);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

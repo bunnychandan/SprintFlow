@@ -3,37 +3,36 @@ import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/authz";
 import { sprintCompleteSchema } from "@/lib/validations";
 import { notifySprintMembers } from "@/lib/sprint/notifications";
+import { handleApiError } from "@/lib/api-error-handler";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
-  const sprint = await prisma.sprint.findFirst({ where: { id, deletedAt: null } });
-  if (!sprint) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
-
-  if (sprint.status !== "ACTIVE") {
-    return NextResponse.json({ error: "Only active sprints can be completed" }, { status: 400 });
-  }
-
-  const authz = await requireProjectAccess(sprint.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER"]);
-  if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
-
-  const actorId = authz.user?.id ?? authz.session?.user?.id;
-  if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const body = await request.json();
-  const parsed = sprintCompleteSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
-  }
-
-  const { forceComplete } = parsed.data;
-
-  let updated: any;
-
   try {
+    const { id } = await params;
+
+    const sprint = await prisma.sprint.findUnique({ where: { id } });
+    if (!sprint || sprint.deletedAt) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
+
+    if (sprint.status !== "ACTIVE") {
+      return NextResponse.json({ error: "Only active sprints can be completed" }, { status: 400 });
+    }
+
+    const authz = await requireProjectAccess(sprint.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
+
+    const actorId = authz.user?.id ?? authz.session?.user?.id;
+    if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await request.json();
+    const parsed = sprintCompleteSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const { forceComplete } = parsed.data;
+
     const result = await prisma.$transaction(async (tx) => {
       if (!forceComplete) {
         const incompleteMandatory = await tx.task.count({
@@ -60,7 +59,18 @@ export async function POST(
 
       return { updated };
     });
-    updated = result.updated;
+
+    await notifySprintMembers({
+      projectId: sprint.projectId,
+      sprintId: id,
+      actorId,
+      type: "SPRINT_COMPLETED",
+      title: "Sprint Completed",
+      message: `Sprint "${sprint.name}" has been completed.`,
+      excludeActor: true,
+    });
+
+    return NextResponse.json({ sprint: result.updated });
   } catch (error: any) {
     if (error?.message?.startsWith("INCOMPLETE_TASKS:")) {
       const count = parseInt(error.message.split(":")[1], 10);
@@ -69,18 +79,6 @@ export async function POST(
         incompleteTasks: count,
       }, { status: 400 });
     }
-    throw error;
+    return handleApiError(error);
   }
-
-  await notifySprintMembers({
-    projectId: sprint.projectId,
-    sprintId: id,
-    actorId,
-    type: "SPRINT_COMPLETED",
-    title: "Sprint Completed",
-    message: `Sprint "${sprint.name}" has been completed.`,
-    excludeActor: true,
-  });
-
-  return NextResponse.json({ sprint: updated });
 }

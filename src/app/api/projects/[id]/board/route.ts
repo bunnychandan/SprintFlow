@@ -66,38 +66,31 @@ export async function GET(
     include: {
       assignee: { select: { id: true, name: true, email: true, image: true } },
       reporter: { select: { id: true, name: true, email: true, image: true } },
-      _count: { select: { comments: true, attachments: true, checklist: true } },
+      checklist: { select: { isChecked: true } },
+      _count: { select: { comments: true, attachments: true } },
     },
   });
 
-  const boardTasks = await Promise.all(
-    tasks.map(async (task) => {
-      const checklistItems = await prisma.taskChecklist.findMany({
-        where: { taskId: task.id },
-        select: { isChecked: true },
-      });
-      return {
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        priority: task.priority,
-        type: task.type,
-        storyPoints: task.storyPoints,
-        assigneeId: task.assigneeId,
-        assignee: task.assignee,
-        reporter: task.reporter,
-        sprintId: task.sprintId,
-        projectId: task.projectId,
-        labels: task.labels as string[] | null,
-        dueDate: task.dueDate?.toISOString() ?? null,
-        order: 0,
-        commentCount: task._count.comments,
-        attachmentCount: task._count.attachments,
-        checklistTotal: checklistItems.length,
-        checklistDone: checklistItems.filter((c) => c.isChecked).length,
-      };
-    })
-  );
+  const boardTasks = tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    type: task.type,
+    storyPoints: task.storyPoints,
+    assigneeId: task.assigneeId,
+    assignee: task.assignee,
+    reporter: task.reporter,
+    sprintId: task.sprintId,
+    projectId: task.projectId,
+    labels: task.labels as string[] | null,
+    dueDate: task.dueDate?.toISOString() ?? null,
+    order: 0,
+    commentCount: task._count.comments,
+    attachmentCount: task._count.attachments,
+    checklistTotal: task.checklist.length,
+    checklistDone: task.checklist.filter((c) => c.isChecked).length,
+  }));
 
   const preferences = await prisma.boardPreference.findUnique({
     where: { projectId_userId: { projectId, userId: authz.user?.id ?? "" } },

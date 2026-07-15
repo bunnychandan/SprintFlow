@@ -9,8 +9,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -30,8 +30,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER", "DEVELOPER"]);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

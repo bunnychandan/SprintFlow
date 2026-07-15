@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
-import { parsePagination } from "@/lib/api-utils";
+import { parsePagination, searchParams, validatedOrderBy } from "@/lib/api-utils";
 import { handleApiError } from "@/lib/api-error-handler";
 
 const notificationInclude = {
@@ -18,15 +18,12 @@ export async function GET(request: Request) {
     const recipientId = authz.user?.id ?? authz.session?.user?.id;
     if (!recipientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { searchParams } = new URL(request.url);
+    const sp = searchParams(request);
     const { skip, take, page, pageSize } = parsePagination(request, 20);
 
-    const search = searchParams.get("search");
-    const type = searchParams.get("type");
-    const priority = searchParams.get("priority");
-    const isRead = searchParams.get("isRead");
-    const sortBy = searchParams.get("sortBy") || "createdAt";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
+    const search = sp.get("search");
+    const type = sp.get("type");
+    const isRead = sp.get("isRead");
 
     const where: Record<string, unknown> = { recipientId };
 
@@ -37,20 +34,13 @@ export async function GET(request: Request) {
       ];
     }
     if (type) where.type = type;
-    if (priority) where.priority = priority;
     if (isRead === "true") where.isRead = true;
     else if (isRead === "false") where.isRead = false;
 
-    const orderBy: Record<string, string> = { [sortBy]: sortOrder };
+    const orderBy = validatedOrderBy(sp.get("sortBy"), sp.get("sortOrder"), ["createdAt", "updatedAt", "title", "type"]);
 
     const [notifications, total, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        include: notificationInclude,
-        orderBy,
-        skip,
-        take,
-      }),
+      prisma.notification.findMany({ where, include: notificationInclude, orderBy, skip, take }),
       prisma.notification.count({ where }),
       prisma.notification.count({ where: { recipientId, isRead: false } }),
     ]);

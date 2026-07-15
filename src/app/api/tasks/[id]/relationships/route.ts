@@ -9,8 +9,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -35,8 +35,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER", "DEVELOPER"]);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -53,8 +53,8 @@ export async function POST(
     return NextResponse.json({ error: "Cannot relate a task to itself" }, { status: 400 });
   }
 
-  const relatedTask = await prisma.task.findFirst({ where: { id: relatedTaskId, deletedAt: null } });
-  if (!relatedTask) return NextResponse.json({ error: "Related task not found" }, { status: 404 });
+  const relatedTask = await prisma.task.findUnique({ where: { id: relatedTaskId } });
+  if (!relatedTask || relatedTask.deletedAt) return NextResponse.json({ error: "Related task not found" }, { status: 404 });
 
   const existing = await prisma.taskRelationship.findFirst({
     where: { taskId: id, relatedTaskId: relatedTaskId },
@@ -84,8 +84,8 @@ export async function DELETE(
   const { searchParams } = new URL(request.url);
   const relatedTaskId = searchParams.get("relatedTaskId");
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER", "DEVELOPER"]);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

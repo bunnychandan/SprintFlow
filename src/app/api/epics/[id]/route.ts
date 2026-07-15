@@ -11,8 +11,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const epic = await prisma.epic.findFirst({
-      where: { id, archivedAt: null },
+    const epic = await prisma.epic.findUnique({
+      where: { id },
       include: {
         owner: { select: { id: true, name: true, email: true, image: true } },
         project: { select: { id: true, name: true, code: true, color: true, status: true } },
@@ -20,7 +20,7 @@ export async function GET(
       },
     });
 
-    if (!epic) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
+    if (!epic || epic.archivedAt) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
 
     const authz = await requireProjectAccess(epic.projectId);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -38,7 +38,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const epic = await prisma.epic.findFirst({ where: { id, archivedAt: null } });
+    const epic = await prisma.epic.findUnique({ where: { id }, select: { id: true, projectId: true, status: true, ownerId: true, title: true } });
     if (!epic) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
 
     if (epic.status === "COMPLETED" || epic.status === "CANCELLED") {
@@ -58,20 +58,14 @@ export async function PUT(
     if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const data = parsed.data;
-
     const dataToUpdate: Record<string, unknown> = {};
-    if (data.title !== undefined) dataToUpdate.title = data.title;
-    if (data.description !== undefined) dataToUpdate.description = data.description;
-    if (data.status !== undefined) dataToUpdate.status = data.status;
-    if (data.priority !== undefined) dataToUpdate.priority = data.priority;
-    if (data.color !== undefined) dataToUpdate.color = data.color;
-    if (data.ownerId !== undefined) dataToUpdate.ownerId = data.ownerId;
+    const scalarFields = ["title", "description", "status", "priority", "color", "ownerId"];
+    for (const field of scalarFields) {
+      if ((data as any)[field] !== undefined) dataToUpdate[field] = (data as any)[field];
+    }
     if (data.startDate !== undefined) dataToUpdate.startDate = data.startDate ? new Date(data.startDate) : null;
     if (data.targetDate !== undefined) dataToUpdate.targetDate = data.targetDate ? new Date(data.targetDate) : null;
-
-    if (data.status === "COMPLETED") {
-      (dataToUpdate as any).completedAt = new Date();
-    }
+    if (data.status === "COMPLETED") (dataToUpdate as any).completedAt = new Date();
 
     const updated = await prisma.epic.update({
       where: { id },
@@ -100,8 +94,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const epic = await prisma.epic.findFirst({ where: { id, archivedAt: null } });
-    if (!epic) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
+    const epic = await prisma.epic.findUnique({ where: { id }, select: { id: true, projectId: true, ownerId: true, title: true, archivedAt: true } });
+    if (!epic || epic.archivedAt) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
 
     const authz = await requireProjectAccess(epic.projectId);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

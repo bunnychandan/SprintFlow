@@ -10,8 +10,8 @@ export async function GET(
   const authz = await requireProjectAccess(id);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
 
-  const project = await prisma.project.findFirst({ where: { id, deletedAt: null } });
-  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project || project.deletedAt) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const tasks = await prisma.task.findMany({
     where: { projectId: id, deletedAt: null },

@@ -9,8 +9,8 @@ export async function PUT(
 ) {
   const { id, commentId } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
   if (!comment || comment.taskId !== id) return NextResponse.json({ error: "Comment not found" }, { status: 404 });
@@ -47,8 +47,8 @@ export async function DELETE(
 ) {
   const { id, commentId } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
   if (!comment || comment.taskId !== id) return NextResponse.json({ error: "Comment not found" }, { status: 404 });

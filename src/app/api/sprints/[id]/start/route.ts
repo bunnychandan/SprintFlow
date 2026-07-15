@@ -10,8 +10,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const sprint = await prisma.sprint.findFirst({ where: { id, deletedAt: null } });
-  if (!sprint) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
+  const sprint = await prisma.sprint.findUnique({ where: { id } });
+  if (!sprint || sprint.deletedAt) return NextResponse.json({ error: "Sprint not found" }, { status: 404 });
 
   if (sprint.status === "COMPLETED" || sprint.status === "CANCELLED") {
     return NextResponse.json({ error: `Cannot start a ${sprint.status.toLowerCase()} sprint` }, { status: 400 });

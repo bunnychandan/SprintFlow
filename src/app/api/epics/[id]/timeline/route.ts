@@ -8,8 +8,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const epic = await prisma.epic.findFirst({ where: { id, archivedAt: null } });
-  if (!epic) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
+  const epic = await prisma.epic.findUnique({ where: { id } });
+  if (!epic || epic.archivedAt) return NextResponse.json({ error: "Epic not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(epic.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

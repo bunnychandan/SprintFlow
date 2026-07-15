@@ -8,8 +8,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const release = await prisma.release.findFirst({ where: { id, archivedAt: null } });
-  if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
+  const release = await prisma.release.findUnique({ where: { id } });
+  if (!release || release.archivedAt) return NextResponse.json({ error: "Release not found" }, { status: 404 });
 
   if (release.status === "RELEASED") {
     return NextResponse.json({ error: "Cannot cancel a published release" }, { status: 400 });

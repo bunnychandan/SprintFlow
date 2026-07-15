@@ -2,25 +2,27 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
 import { projectCreateSchema } from "@/lib/validations";
-import { parsePagination, paginationMeta } from "@/lib/api-utils";
+import { parsePagination, paginationMeta, searchParams, validatedOrderBy, searchFilter } from "@/lib/api-utils";
 import { notifyProjectMembers } from "@/lib/project/notifications";
 import { handleApiError } from "@/lib/api-error-handler";
+
+const projectInclude = {
+  owner: { select: { id: true, name: true, email: true, image: true } },
+  members: {
+    include: { user: { select: { id: true, name: true, email: true, image: true, role: true } } },
+  },
+  _count: { select: { tasks: true, sprints: true, members: true } },
+};
 
 export async function GET(request: Request) {
   try {
     const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
 
+    const sp = searchParams(request);
+    const { skip, take, page, pageSize } = parsePagination(request);
     const userId = authz.user?.id;
     const userRole = authz.user?.role;
-    const { skip, take, page, pageSize } = parsePagination(request);
-    const { searchParams } = new URL(request.url);
-
-    const search = searchParams.get("search");
-    const status = searchParams.get("status");
-    const visibility = searchParams.get("visibility");
-    const sortBy = searchParams.get("sortBy") || "createdAt";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const where: Record<string, unknown> = {
       deletedAt: null,
@@ -29,35 +31,17 @@ export async function GET(request: Request) {
         : {}),
     };
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { code: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
+    const status = sp.get("status");
+    const visibility = sp.get("visibility");
     if (status) where.status = status;
     if (visibility) where.visibility = visibility;
 
-    const validSortFields = ["createdAt", "updatedAt", "name", "status"];
-    const orderField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
-    const orderDir = sortOrder === "asc" ? "asc" : "desc";
+    where.OR = searchFilter(sp.get("search"), ["name", "code", "description"]);
+
+    const orderBy = validatedOrderBy(sp.get("sortBy"), sp.get("sortOrder"), ["createdAt", "updatedAt", "name", "status"]);
 
     const [projects, total] = await Promise.all([
-      prisma.project.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { [orderField]: orderDir },
-        include: {
-          owner: { select: { id: true, name: true, email: true, image: true } },
-          members: {
-            include: { user: { select: { id: true, name: true, email: true, image: true, role: true } } },
-          },
-          _count: { select: { tasks: true, sprints: true, members: true } },
-        },
-      }),
+      prisma.project.findMany({ where, skip, take, orderBy, include: projectInclude }),
       prisma.project.count({ where }),
     ]);
 
@@ -70,10 +54,7 @@ export async function GET(request: Request) {
       favorites = new Set(favs.map((f) => f.projectId));
     }
 
-    const projectsWithFav = projects.map((p) => ({
-      ...p,
-      isFavorited: favorites.has(p.id),
-    }));
+    const projectsWithFav = projects.map((p) => ({ ...p, isFavorited: favorites.has(p.id) }));
 
     return NextResponse.json({ projects: projectsWithFav, pagination: paginationMeta(total, { skip, take, page, pageSize }) });
   } catch (error) {

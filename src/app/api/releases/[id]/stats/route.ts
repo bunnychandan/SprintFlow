@@ -8,8 +8,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const release = await prisma.release.findFirst({ where: { id, archivedAt: null } });
-  if (!release) return NextResponse.json({ error: "Release not found" }, { status: 404 });
+  const release = await prisma.release.findUnique({ where: { id } });
+  if (!release || release.archivedAt) return NextResponse.json({ error: "Release not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(release.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });

@@ -49,15 +49,6 @@ export async function getAuditDashboard() {
   return res.json();
 }
 
-export async function getAuditActivity(params?: { limit?: number }) {
-  const sp = new URLSearchParams();
-  if (params?.limit) sp.set("limit", String(params.limit));
-  const qs = sp.toString();
-  const res = await fetch(`/api/admin/audit/activity${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error("Failed to fetch activity feed");
-  return res.json();
-}
-
 export async function exportAuditLogs(params?: {
   format?: string;
   search?: string;

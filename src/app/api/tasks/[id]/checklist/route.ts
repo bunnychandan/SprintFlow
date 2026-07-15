@@ -9,8 +9,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -29,8 +29,8 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const task = await prisma.task.findFirst({ where: { id, deletedAt: null }, select: { id: true, projectId: true } });
-  if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  const task = await prisma.task.findUnique({ where: { id }, select: { id: true, projectId: true, deletedAt: true } });
+  if (!task || task.deletedAt) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
   const authz = await requireProjectAccess(task.projectId, ["PROJECT_MANAGER", "SCRUM_MASTER", "DEVELOPER"]);
   if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
@@ -45,22 +45,26 @@ export async function POST(
   const actorId = authz.user?.id ?? authz.session?.user?.id;
   if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const maxOrder = await prisma.taskChecklist.aggregate({
-    where: { taskId: id },
-    _max: { order: true },
-  });
+  const { item } = await prisma.$transaction(async (tx) => {
+    const maxOrder = await tx.taskChecklist.aggregate({
+      where: { taskId: id },
+      _max: { order: true },
+    });
 
-  const item = await prisma.taskChecklist.create({
-    data: {
-      taskId: id,
-      title: data.title,
-      isChecked: data.isChecked ?? false,
-      order: (maxOrder._max.order ?? -1) + 1,
-    },
-  });
+    const item = await tx.taskChecklist.create({
+      data: {
+        taskId: id,
+        title: data.title,
+        isChecked: data.isChecked ?? false,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
 
-  await prisma.auditLog.create({
-    data: { actorId, entityType: "TASK", entityId: id, action: "ADD_CHECKLIST_ITEM", details: `Added checklist item "${data.title}"`, projectId: task.projectId },
+    await tx.auditLog.create({
+      data: { actorId, entityType: "TASK", entityId: id, action: "ADD_CHECKLIST_ITEM", details: `Added checklist item "${data.title}"`, projectId: task.projectId },
+    });
+
+    return { item };
   });
 
   return NextResponse.json({ item }, { status: 201 });

@@ -1,5 +1,8 @@
 import type { User, AuditLog, Invitation } from "@prisma/client";
 
+import type { SortDirection } from "./project";
+export type { SortDirection };
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -76,7 +79,6 @@ export interface AdminStats {
   totalAdmins: number;
 }
 
-export type SortDirection = "asc" | "desc";
 
 export interface TableColumn<T> {
   key: string;

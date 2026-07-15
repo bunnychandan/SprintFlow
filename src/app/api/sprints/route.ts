@@ -2,27 +2,33 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireProjectAccess } from "@/lib/authz";
 import { sprintCreateSchema } from "@/lib/validations";
-import { parsePagination, paginationMeta } from "@/lib/api-utils";
+import { parsePagination, paginationMeta, searchParams, validatedOrderBy, searchFilter } from "@/lib/api-utils";
 import { notifySprintMembers } from "@/lib/sprint/notifications";
 import { handleApiError } from "@/lib/api-error-handler";
+
+const sprintInclude = {
+  project: { select: { id: true, name: true, code: true, color: true } },
+  createdBy: { select: { id: true, name: true, email: true, image: true } },
+  tasks: {
+    where: { deletedAt: null },
+    select: { status: true, storyPoints: true },
+  },
+  _count: { select: { tasks: true } },
+};
 
 export async function GET(request: Request) {
   try {
     const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
     if (!authz.ok) return NextResponse.json({ error: "Forbidden" }, { status: authz.status });
 
+    const sp = searchParams(request);
+    const { skip, take, page, pageSize } = parsePagination(request);
     const userId = authz.user?.id;
     const userRole = authz.user?.role;
-    const { skip, take, page, pageSize } = parsePagination(request);
-    const { searchParams } = new URL(request.url);
-
-    const search = searchParams.get("search");
-    const status = searchParams.get("status");
-    const projectId = searchParams.get("projectId");
-    const sortBy = searchParams.get("sortBy") || "createdAt";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const where: Record<string, unknown> = { deletedAt: null };
+    const status = sp.get("status");
+    const projectId = sp.get("projectId");
 
     if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
       const userProjects = await prisma.projectMember.findMany({
@@ -32,60 +38,27 @@ export async function GET(request: Request) {
       where.projectId = { in: userProjects.map((p) => p.projectId) };
     }
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { goal: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
+    where.OR = searchFilter(sp.get("search"), ["name", "goal"]);
     if (status) where.status = status;
     if (projectId) where.projectId = projectId;
 
-    const validSort = ["createdAt", "updatedAt", "name", "startDate", "endDate", "status"];
-    const orderField = validSort.includes(sortBy) ? sortBy : "createdAt";
-    const orderDir = sortOrder === "asc" ? "asc" : "desc";
+    const orderBy = validatedOrderBy(sp.get("sortBy"), sp.get("sortOrder"), ["createdAt", "updatedAt", "name", "startDate", "endDate", "status"]);
 
     const [sprints, total] = await Promise.all([
-      prisma.sprint.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { [orderField]: orderDir },
-        include: {
-          project: { select: { id: true, name: true, code: true, color: true } },
-          createdBy: { select: { id: true, name: true, email: true, image: true } },
-          tasks: {
-            where: { deletedAt: null },
-            select: { status: true, storyPoints: true },
-          },
-          _count: { select: { tasks: true } },
-        },
-      }),
+      prisma.sprint.findMany({ where, skip, take, orderBy, include: sprintInclude }),
       prisma.sprint.count({ where }),
     ]);
 
     const sprintsWithStats = sprints.map((sprint) => {
-      const tasks = sprint.tasks;
-      const completedTasks = tasks.filter((t) => t.status === "DONE").length;
-      const totalStoryPoints = tasks.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
-      const completedStoryPoints = tasks
-        .filter((t) => t.status === "DONE")
-        .reduce((sum, t) => sum + (t.storyPoints || 0), 0);
-
-      const { tasks: _tasks, ...sprintData } = sprint;
-      return {
-        ...sprintData,
-        completedTasks,
-        totalStoryPoints,
-        completedStoryPoints,
-      };
+      const { tasks, ...sprintData } = sprint as any;
+      const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
+      const totalStoryPoints = tasks.reduce((sum: number, t: any) => sum + (t.storyPoints || 0), 0);
+      const completedStoryPoints = tasks.filter((t: any) => t.status === "DONE")
+        .reduce((sum: number, t: any) => sum + (t.storyPoints || 0), 0);
+      return { ...sprintData, completedTasks, totalStoryPoints, completedStoryPoints };
     });
 
-    return NextResponse.json({
-      sprints: sprintsWithStats,
-      pagination: paginationMeta(total, { skip, take, page, pageSize }),
-    });
+    return NextResponse.json({ sprints: sprintsWithStats, pagination: paginationMeta(total, { skip, take, page, pageSize }) });
   } catch (error) {
     return handleApiError(error, "GET /api/sprints");
   }
