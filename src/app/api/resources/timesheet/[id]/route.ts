@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const body = await request.json();
@@ -12,7 +12,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const entry = await prisma.workLog.findUnique({ where: { id }, include: { timesheet: true } });
   if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
 
-  if (entry.userId !== session.user.id) {
+  if (entry.userId !== authz.user!.id) {
     return NextResponse.json({ error: "Cannot edit another user's entry" }, { status: 403 });
   }
 
@@ -46,15 +46,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
 
   const entry = await prisma.workLog.findUnique({ where: { id }, include: { timesheet: true } });
   if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
 
-  if (entry.userId !== session.user.id) {
+  if (entry.userId !== authz.user!.id) {
     return NextResponse.json({ error: "Cannot delete another user's entry" }, { status: 403 });
   }
 

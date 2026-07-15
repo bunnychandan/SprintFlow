@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await request.json();
   if (!id) return NextResponse.json({ error: "Timesheet ID required" }, { status: 400 });
-
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
-    return NextResponse.json({ error: "Only admins can approve timesheets" }, { status: 403 });
-  }
 
   const timesheet = await prisma.timesheet.findUnique({ where: { id }, include: { user: true } });
   if (!timesheet) return NextResponse.json({ error: "Timesheet not found" }, { status: 404 });
@@ -23,13 +18,13 @@ export async function POST(request: Request) {
 
   const updated = await prisma.timesheet.update({
     where: { id },
-    data: { status: "APPROVED", approvedAt: new Date(), approverId: session.user.id },
+    data: { status: "APPROVED", approvedAt: new Date(), approverId: authz.user!.id },
     include: { user: { select: { name: true, email: true } }, approver: { select: { name: true } } },
   });
 
   await prisma.auditLog.create({
     data: {
-      actorId: session.user.id,
+      actorId: authz.user!.id,
       entityType: "Timesheet",
       entityId: id,
       action: "APPROVE",

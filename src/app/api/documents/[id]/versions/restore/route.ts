@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const body = await request.json();
@@ -21,12 +21,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const [updated] = await prisma.$transaction([
     prisma.document.update({
       where: { id },
-      data: { title: versionRecord.title, content: versionRecord.content, version: doc.version + 1, updatedById: session.user.id },
+      data: { title: versionRecord.title, content: versionRecord.content, version: doc.version + 1, updatedById: authz.user!.id },
     }),
     prisma.documentVersion.create({
-      data: { documentId: id, version: doc.version + 1, title: versionRecord.title, content: versionRecord.content, createdById: session.user.id },
+      data: { documentId: id, version: doc.version + 1, title: versionRecord.title, content: versionRecord.content, createdById: authz.user!.id },
     }),
-    prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "DOCUMENT", entityId: id, action: "VERSION_RESTORE", metadata: { restoredVersion: version }, success: true } }),
+    prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "DOCUMENT", entityId: id, action: "VERSION_RESTORE", metadata: { restoredVersion: version }, success: true } }),
   ]);
 
   return NextResponse.json({ id: updated.id, version: updated.version, title: updated.title, content: updated.content });

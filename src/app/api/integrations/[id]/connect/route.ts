@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { NextRequest, NextResponse } from "next/server";
 import { connectIntegration } from "@/lib/integrations/service";
 import { handleApiError } from "@/lib/api-error-handler";
@@ -6,11 +6,11 @@ import { handleApiError } from "@/lib/api-error-handler";
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
     const body = await req.json();
     const orgId = body.organizationId || "";
-    const result = await connectIntegration(id, orgId, session.user.id);
+    const result = await connectIntegration(id, orgId, authz.user!.id);
     if (!result) return NextResponse.json({ error: "Integration not found" }, { status: 404 });
     return NextResponse.json(result);
   } catch (error) {

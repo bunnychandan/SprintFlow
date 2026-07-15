@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const [totalBases, totalDocuments, publishedCount, draftCount, reviewCount, archivedCount, recentDocuments, popularDocuments, favoriteDocuments, bases] = await Promise.all([
     prisma.knowledgeBase.count(),
@@ -20,19 +17,19 @@ export async function GET() {
       where: { archivedAt: null },
       orderBy: { updatedAt: "desc" },
       take: 5,
-      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } }, favorites: { where: { userId: user.id } } },
+      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } },       favorites: { where: { userId: authz.user!.id } } },
     }),
     prisma.document.findMany({
       where: { status: "PUBLISHED" },
       orderBy: { updatedAt: "desc" },
       take: 5,
-      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } }, favorites: { where: { userId: user.id } } },
+      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } },       favorites: { where: { userId: authz.user!.id } } },
     }),
     prisma.document.findMany({
-      where: { favorites: { some: { userId: user.id } } },
+      where: { favorites: { some: { userId: authz.user!.id } } },
       orderBy: { updatedAt: "desc" },
       take: 5,
-      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } }, favorites: { where: { userId: user.id } } },
+      include: { knowledgeBase: { select: { name: true } }, createdBy: { select: { name: true } }, updatedBy: { select: { name: true } }, reviewer: { select: { name: true } }, _count: { select: { comments: true, favorites: true } },       favorites: { where: { userId: authz.user!.id } } },
     }),
     prisma.knowledgeBase.findMany({
       include: { _count: { select: { documents: true } }, createdBy: { select: { name: true } } },

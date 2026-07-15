@@ -1,12 +1,12 @@
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { NextRequest, NextResponse } from "next/server";
 import { getIntegrationsList, createIntegration } from "@/lib/integrations/service";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
     const orgId = req.nextUrl.searchParams.get("organizationId") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
     const pageSize = parseInt(req.nextUrl.searchParams.get("pageSize") || "20");
@@ -22,11 +22,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
     const body = await req.json();
     const orgId = body.organizationId || "";
-    const integration = await createIntegration(orgId, session.user.id, body);
+    const integration = await createIntegration(orgId, authz.user!.id, body);
     return NextResponse.json(integration, { status: 201 });
   } catch (error) {
     return handleApiError(error, "POST /api/integrations");

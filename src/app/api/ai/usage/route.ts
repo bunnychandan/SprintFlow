@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "daily";
@@ -15,12 +15,10 @@ export async function GET(request: Request) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
-
+    const isAdmin = authz.user!.role === "SUPER_ADMIN" || authz.user!.role === "ADMIN";
     const where: Record<string, unknown> = {};
     if (provider) where.provider = provider;
-    if (!isAdmin) where.userId = session.user.id;
+    if (!isAdmin) where.userId = authz.user!.id;
     else if (userId) where.userId = userId;
     if (from) where.createdAt = { ...(where.createdAt || {}), gte: new Date(from) } as any;
     if (to) where.createdAt = { ...(where.createdAt || {}), lte: new Date(to) } as any;

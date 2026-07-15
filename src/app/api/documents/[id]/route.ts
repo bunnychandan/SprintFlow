@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const doc = await prisma.document.findUnique({
@@ -13,8 +13,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       createdBy: { select: { name: true } },
       updatedBy: { select: { name: true } },
       reviewer: { select: { name: true } },
-      parent: { include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: session.user.id }, select: { id: true } } } },
-      children: { include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: session.user.id }, select: { id: true } } }, orderBy: { title: "asc" } },
+      parent: { include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: authz.user!.id }, select: { id: true } } } },
+      children: { include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: authz.user!.id }, select: { id: true } } }, orderBy: { title: "asc" } },
       comments: { include: { author: { select: { name: true, image: true } } }, orderBy: { createdAt: "desc" } },
       versions: { include: { createdBy: { select: { name: true } } }, orderBy: { version: "desc" }, take: 50 },
       favorites: { select: { userId: true } },
@@ -32,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     publishedAt: d.publishedAt?.toISOString() || null, archivedAt: d.archivedAt?.toISOString() || null,
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
     childCount: d._count?.children || 0, commentCount: d._count?.comments || 0,
-    isFavorited: d.favorites?.some((f: any) => f.userId === session.user.id) || false,
+    isFavorited: d.favorites?.some((f: any) => f.userId === authz.user!.id) || false,
   });
 
   return NextResponse.json({
@@ -47,8 +47,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const doc = await prisma.document.findUnique({ where: { id } });
@@ -67,7 +67,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (icon !== undefined) updateData.icon = icon;
   if (coverImage !== undefined) updateData.coverImage = coverImage;
   if (parentId !== undefined) updateData.parentId = parentId || null;
-  updateData.updatedById = session.user.id;
+  updateData.updatedById = authz.user!.id;
 
   if (slug !== undefined) {
     const existing = await prisma.document.findUnique({ where: { knowledgeBaseId_slug: { knowledgeBaseId: doc.knowledgeBaseId, slug } } });
@@ -84,14 +84,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const docUpdate = await tx.document.update({
       where: { id },
       data: updateData,
-      include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: session.user.id }, select: { id: true } } },
+      include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: authz.user!.id }, select: { id: true } } },
     });
     if (isContentChange) {
       await tx.documentVersion.create({
-        data: { documentId: id, version: doc.version + 1, title: title || doc.title, content: content || doc.content, createdById: session.user.id },
+        data: { documentId: id, version: doc.version + 1, title: title || doc.title, content: content || doc.content, createdById: authz.user!.id },
       });
     }
-    await tx.auditLog.create({ data: { actorId: session.user.id, entityType: "DOCUMENT", entityId: id, action: "UPDATE", success: true } });
+    await tx.auditLog.create({ data: { actorId: authz.user!.id, entityType: "DOCUMENT", entityId: id, action: "UPDATE", success: true } });
     return [docUpdate];
   });
 
@@ -108,20 +108,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const doc = await prisma.document.findUnique({ where: { id } });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (doc.createdById !== session.user.id && user?.role === "USER") {
+  if (doc.createdById !== authz.user!.id && authz.user!.role === "USER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await prisma.document.delete({ where: { id } });
-  await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "DOCUMENT", entityId: id, action: "DELETE", success: true } });
+  await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "DOCUMENT", entityId: id, action: "DELETE", success: true } });
 
   return NextResponse.json({ success: true });
 }

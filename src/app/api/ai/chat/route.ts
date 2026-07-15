@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { sendMessage, countTokens } from "@/lib/ai/provider-registry";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const body = await request.json();
     const { conversationId, message, provider, agentType, model, projectId, sprintId, taskId } = body;
@@ -18,13 +18,13 @@ export async function POST(request: Request) {
     let conversation;
 
     if (conversationId) {
-      conversation = await prisma.aIConversation.findFirst({ where: { id: conversationId, userId: session.user.id } });
+      conversation = await prisma.aIConversation.findFirst({ where: { id: conversationId, userId: authz.user!.id } });
       if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     } else {
       const org = await prisma.organization.findFirst();
       if (!org) return NextResponse.json({ error: "No organization" }, { status: 404 });
       conversation = await prisma.aIConversation.create({
-        data: { organizationId: org.id, userId: session.user.id, title: message.slice(0, 100), agentType: agentType || "GENERAL", provider: aiProvider, projectId, sprintId, taskId },
+        data: { organizationId: org.id, userId: authz.user!.id, title: message.slice(0, 100), agentType: agentType || "GENERAL", provider: aiProvider, projectId, sprintId, taskId },
       });
     }
 
@@ -60,10 +60,10 @@ export async function POST(request: Request) {
     });
 
     await prisma.aIUsage.create({
-      data: { organizationId: conversation.organizationId, userId: session.user.id, provider: aiProvider, model: aiResponse.model, tokens: aiResponse.tokenCount.input + aiResponse.tokenCount.output, requests: 1, cost: aiResponse.cost },
+      data: { organizationId: conversation.organizationId, userId: authz.user!.id, provider: aiProvider, model: aiResponse.model, tokens: aiResponse.tokenCount.input + aiResponse.tokenCount.output, requests: 1, cost: aiResponse.cost },
     });
 
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "AI_MESSAGE", entityId: assistantMessage.id, action: "CREATE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "AI_MESSAGE", entityId: assistantMessage.id, action: "CREATE", success: true } });
 
     return NextResponse.json({
       message: { id: assistantMessage.id, conversationId: assistantMessage.conversationId, role: assistantMessage.role, content: assistantMessage.content, tokenCount: assistantMessage.tokenCount, model: assistantMessage.model, responseTime: assistantMessage.responseTime, metadata: assistantMessage.metadata, createdAt: assistantMessage.createdAt.toISOString() },

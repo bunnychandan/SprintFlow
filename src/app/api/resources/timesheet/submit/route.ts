@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await request.json();
   if (!id) return NextResponse.json({ error: "Timesheet ID required" }, { status: 400 });
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   });
 
   if (!timesheet) return NextResponse.json({ error: "Timesheet not found" }, { status: 404 });
-  if (timesheet.userId !== session.user.id) return NextResponse.json({ error: "Cannot submit another user's timesheet" }, { status: 403 });
+  if (timesheet.userId !== authz.user!.id) return NextResponse.json({ error: "Cannot submit another user's timesheet" }, { status: 403 });
   if (timesheet.status !== "DRAFT") return NextResponse.json({ error: "Timesheet already submitted/approved/rejected" }, { status: 400 });
 
   if (timesheet.entries.length === 0) {
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   await prisma.auditLog.create({
     data: {
-      actorId: session.user.id,
+      actorId: authz.user!.id,
       entityType: "Timesheet",
       entityId: id,
       action: "SUBMIT",

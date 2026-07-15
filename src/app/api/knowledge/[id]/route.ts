@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { id } = await params;
     const kb = await prisma.knowledgeBase.findUnique({
@@ -39,8 +39,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { id } = await params;
     const kb = await prisma.knowledgeBase.findUnique({ where: { id } });
@@ -66,7 +66,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       include: { createdBy: { select: { name: true } }, _count: { select: { documents: true } } },
     });
 
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "KNOWLEDGE_BASE", entityId: id, action: "UPDATE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "KNOWLEDGE_BASE", entityId: id, action: "UPDATE", success: true } });
 
     return NextResponse.json({
       id: updated.id, organizationId: updated.organizationId, name: updated.name, description: updated.description,
@@ -82,18 +82,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role === "USER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
+    if (authz.user!.role === "USER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { id } = await params;
     const kb = await prisma.knowledgeBase.findUnique({ where: { id } });
     if (!kb) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await prisma.knowledgeBase.delete({ where: { id } });
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "KNOWLEDGE_BASE", entityId: id, action: "DELETE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "KNOWLEDGE_BASE", entityId: id, action: "DELETE", success: true } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

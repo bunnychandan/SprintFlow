@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id } = await params;
   const original = await prisma.document.findUnique({
@@ -21,10 +21,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const duplicate = await prisma.$transaction(async (tx) => {
     const created = await tx.document.create({
-      data: { knowledgeBaseId: targetKnowledgeBaseId, parentId: original.parentId, title: `${original.title} (Copy)`, slug, content: original.content, excerpt: original.excerpt, type: original.type, visibility: original.visibility, icon: original.icon, coverImage: original.coverImage, createdById: session.user.id, updatedById: session.user.id },
+      data: { knowledgeBaseId: targetKnowledgeBaseId, parentId: original.parentId, title: `${original.title} (Copy)`, slug, content: original.content, excerpt: original.excerpt, type: original.type, visibility: original.visibility, icon: original.icon, coverImage: original.coverImage, createdById: authz.user!.id, updatedById: authz.user!.id },
     });
 
-    await tx.auditLog.create({ data: { actorId: session.user.id, entityType: "DOCUMENT", entityId: created.id, action: "DUPLICATE", metadata: { originalId: id }, success: true } });
+    await tx.auditLog.create({ data: { actorId: authz.user!.id, entityType: "DOCUMENT", entityId: created.id, action: "DUPLICATE", metadata: { originalId: id }, success: true } });
 
     return created;
   });

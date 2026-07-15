@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1", 10);
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     prisma.document.count({ where: where as any }),
     prisma.document.findMany({
       where: where as any,
-      include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: session.user.id }, select: { id: true } } },
+      include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } },       favorites: { where: { userId: authz.user!.id }, select: { id: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -54,8 +54,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const body = await request.json();
   const { knowledgeBaseId, parentId, title, slug, content, excerpt, type, visibility, icon, coverImage } = body;
@@ -71,11 +71,11 @@ export async function POST(request: Request) {
   if (existing) return NextResponse.json({ error: "A document with this slug already exists in this knowledge base" }, { status: 409 });
 
   const doc = await prisma.document.create({
-    data: { knowledgeBaseId, parentId: parentId || null, title, slug: docSlug, content, excerpt, type: type || "DOCUMENT", visibility: visibility || "ORGANIZATION", icon, coverImage, createdById: session.user.id, updatedById: session.user.id },
-    include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: session.user.id }, select: { id: true } } },
+    data: { knowledgeBaseId, parentId: parentId || null, title, slug: docSlug, content, excerpt, type: type || "DOCUMENT", visibility: visibility || "ORGANIZATION", icon, coverImage,       createdById: authz.user!.id, updatedById: authz.user!.id },
+    include: { createdBy: { select: { name: true } }, _count: { select: { children: true, comments: true } }, favorites: { where: { userId: authz.user!.id }, select: { id: true } } },
   });
 
-  await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "DOCUMENT", entityId: doc.id, action: "CREATE", success: true } });
+  await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "DOCUMENT", entityId: doc.id, action: "CREATE", success: true } });
 
   return NextResponse.json({
     id: doc.id, knowledgeBaseId: doc.knowledgeBaseId, parentId: doc.parentId, title: doc.title, slug: doc.slug,

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId") || session.user.id;
+  const userId = searchParams.get("userId") || authz.user!.id;
   const weekStart = searchParams.get("weekStart");
 
   const where: Record<string, unknown> = { userId };
@@ -63,8 +63,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const body = await request.json();
   const { taskId, description, timeSpent, billable, loggedAt, timesheetId } = body;
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   }
 
   const existing = await prisma.workLog.findFirst({
-    where: { userId: session.user.id, taskId, loggedAt: new Date(loggedAt) },
+    where: { userId: authz.user!.id, taskId, loggedAt: new Date(loggedAt) },
   });
   if (existing) {
     return NextResponse.json({ error: "Duplicate entry: already logged time for this task on this date" }, { status: 409 });
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   const entry = await prisma.workLog.create({
     data: {
       taskId,
-      userId: session.user.id,
+      userId: authz.user!.id,
       description: description || null,
       timeSpent,
       billable: billable ?? true,

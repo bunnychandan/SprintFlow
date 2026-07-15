@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { id } = await params;
     const conversation = await prisma.aIConversation.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: authz.user!.id },
       include: { messages: { orderBy: { createdAt: "asc" } }, _count: { select: { messages: true } } },
     });
 
@@ -36,14 +36,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { id } = await params;
     const body = await request.json();
     const { title, status, agentType, provider } = body;
 
-    const conversation = await prisma.aIConversation.findFirst({ where: { id, userId: session.user.id } });
+    const conversation = await prisma.aIConversation.findFirst({ where: { id, userId: authz.user!.id } });
     if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
@@ -68,15 +68,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { id } = await params;
-    const conversation = await prisma.aIConversation.findFirst({ where: { id, userId: session.user.id } });
+    const conversation = await prisma.aIConversation.findFirst({ where: { id, userId: authz.user!.id } });
     if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await prisma.aIConversation.delete({ where: { id } });
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "AI_CONVERSATION", entityId: id, action: "DELETE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "AI_CONVERSATION", entityId: id, action: "DELETE", success: true } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

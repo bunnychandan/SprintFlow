@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string; commentId: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id, commentId } = await params;
-  const comment = await prisma.documentComment.findFirst({ where: { id: commentId, documentId: id, authorId: session.user.id } });
+  const comment = await prisma.documentComment.findFirst({ where: { id: commentId, documentId: id, authorId: authz.user!.id } });
   if (!comment) return NextResponse.json({ error: "Not found or not authorized" }, { status: 404 });
 
   const body = await request.json();
@@ -24,15 +24,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string; commentId: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+  if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
   const { id, commentId } = await params;
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   const comment = await prisma.documentComment.findFirst({ where: { id: commentId, documentId: id } });
   if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (comment.authorId !== session.user.id && user?.role === "USER") {
+  if (comment.authorId !== authz.user!.id && authz.user!.role === "USER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

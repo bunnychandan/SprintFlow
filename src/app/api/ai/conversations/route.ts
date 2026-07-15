@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || "20", 10);
 
-    const where = { userId: session.user.id, status: "ACTIVE" as const };
+    const where = { userId: authz.user!.id, status: "ACTIVE" as const };
 
     const [total, items] = await Promise.all([
       prisma.aIConversation.count({ where }),
@@ -42,8 +42,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const body = await request.json();
     const { title, agentType, provider, projectId, sprintId, taskId } = body;
@@ -56,10 +56,10 @@ export async function POST(request: Request) {
     }
 
     const conversation = await prisma.aIConversation.create({
-      data: { organizationId: org.id, userId: session.user.id, title: title || "New Conversation", agentType: agentType || "GENERAL", provider: provider || "OPENAI", projectId, sprintId, taskId },
+      data: { organizationId: org.id, userId: authz.user!.id, title: title || "New Conversation", agentType: agentType || "GENERAL", provider: provider || "OPENAI", projectId, sprintId, taskId },
     });
 
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "AI_CONVERSATION", entityId: conversation.id, action: "CREATE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "AI_CONVERSATION", entityId: conversation.id, action: "CREATE", success: true } });
 
     return NextResponse.json({
       id: conversation.id, organizationId: conversation.organizationId, userId: conversation.userId,

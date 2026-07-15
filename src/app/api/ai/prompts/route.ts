@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
@@ -34,8 +34,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const body = await request.json();
     const { name, category, description, prompt, isPublic } = body;
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     if (!org) return NextResponse.json({ error: "No organization" }, { status: 404 });
 
     const created = await prisma.aIPromptTemplate.create({
-      data: { organizationId: org.id, name, category: category || "GENERAL", description, prompt, createdById: session.user.id, isPublic: isPublic || false },
+      data: { organizationId: org.id, name, category: category || "GENERAL", description, prompt, createdById: authz.user!.id, isPublic: isPublic || false },
       include: { createdBy: { select: { name: true } } },
     });
 

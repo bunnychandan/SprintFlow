@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { requireRole } from "@/lib/authz";
 import { handleApiError } from "@/lib/api-error-handler";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
@@ -47,13 +47,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN" && user.role !== "USER")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const authz = await requireRole(["SUPER_ADMIN", "ADMIN", "USER"]);
+    if (!authz.ok) return NextResponse.json({ error: "Unauthorized" }, { status: authz.status });
 
     const body = await request.json();
     const { name, description, slug, icon, color } = body;
@@ -68,11 +63,11 @@ export async function POST(request: Request) {
     if (existing) return NextResponse.json({ error: "A knowledge base with this slug already exists" }, { status: 409 });
 
     const kb = await prisma.knowledgeBase.create({
-      data: { organizationId: org.id, name, description, slug: kbSlug, icon, color: color || "#6366f1", createdById: session.user.id },
+      data: { organizationId: org.id, name, description, slug: kbSlug, icon, color: color || "#6366f1", createdById: authz.user!.id },
       include: { createdBy: { select: { name: true } }, _count: { select: { documents: true } } },
     });
 
-    await prisma.auditLog.create({ data: { actorId: session.user.id, entityType: "KNOWLEDGE_BASE", entityId: kb.id, action: "CREATE", success: true } });
+    await prisma.auditLog.create({ data: { actorId: authz.user!.id, entityType: "KNOWLEDGE_BASE", entityId: kb.id, action: "CREATE", success: true } });
 
     return NextResponse.json({
       id: kb.id, organizationId: kb.organizationId, name: kb.name, description: kb.description,
