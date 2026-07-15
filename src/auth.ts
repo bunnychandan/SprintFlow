@@ -171,5 +171,9 @@ export function getAuthHandler() {
 }
 
 export async function auth(): Promise<Session | null> {
-  return getServerSession(getAuthOptions());
+  try {
+    return getServerSession(getAuthOptions());
+  } catch {
+    return null;
+  }
 }
