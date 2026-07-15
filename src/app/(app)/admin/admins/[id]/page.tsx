@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
@@ -30,7 +31,9 @@ export default async function AdminProfilePage({ params }: PageProps) {
   });
   if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) notFound();
 
-  const managedProjects = await prisma.projectMember.findMany({
+  const managedProjects: Prisma.ProjectMemberGetPayload<{
+    include: { project: { select: { id: true; name: true; code: true; status: true; _count: { select: { members: true; tasks: true } } } } }
+  }>[] = await prisma.projectMember.findMany({
     where: { userId: id, roleInProject: "PROJECT_MANAGER" },
     include: { project: { select: { id: true, name: true, code: true, status: true, _count: { select: { members: true, tasks: true } } } } },
   });
